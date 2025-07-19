@@ -21,7 +21,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'corsheaders'
+    'corsheaders',
     'hitechroboticsapp.apps.HitechroboticsappConfig',
     'rest_framework',
     'django_filters',
@@ -29,7 +29,7 @@ INSTALLED_APPS = [
 
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware'
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
 
