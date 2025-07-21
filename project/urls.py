@@ -21,14 +21,13 @@ from django.conf.urls.static import static
 from django.conf.urls.i18n import i18n_patterns
 
 urlpatterns = [
-    path('api/', include('hitechroboticsapp.urls')),
     path('i18n/', include('django.conf.urls.i18n')),  # for language switching
 ]
 
 # Routes with language prefixes (/en/, /ru/, /uz/)
 urlpatterns += i18n_patterns(
     path('admin/', admin.site.urls),
-    path('', include('hitechroboticsapp.urls')),
+    path('api/', include('hitechroboticsapp.urls')),
 )
 
 if settings.DEBUG:
