@@ -32,6 +32,12 @@ class Product(models.Model):
     product_category = models.ForeignKey(Category, on_delete=models.CASCADE, help_text="Category of the product")
     product_quantity = models.IntegerField()
     product_image = models.ImageField(upload_to='product_image/', null=True, blank=True)
+    landing_image = models.ImageField(
+        upload_to='product_card_images/',
+        null=True,
+        blank=True,
+        help_text="Image used in category landing cards"
+    )
 
     # Specs
     product_speed = models.IntegerField(help_text="Speed in km/h or m/s")

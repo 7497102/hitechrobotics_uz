@@ -119,10 +119,10 @@ class ProductSerializer(serializers.ModelSerializer):
             'dimensions_cm',
             'protection_level',
             'voice_recognition',
-            'front-light',
+            'front_light',
             'carrying_strap',
             'processor',
-            'cameras_sensor',
+            'cameras_sensors',
             'camera_specs',
             'wifi',
             'bluetooth_version',
@@ -332,3 +332,25 @@ class ContactInfoSerializer(serializers.ModelSerializer):
                 "locations": locations
             }
         }
+
+
+class ProductCardSerializer(serializers.ModelSerializer):
+    title = serializers.CharField(source='product_name')
+    description = serializers.CharField(source='product_description')
+    slug = serializers.SlugField()
+    image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Product
+        fields = ('title', 'slug', 'description', 'image')
+
+    def get_image(self, obj):
+        if obj.landing_image and hasattr(obj.landing_image, 'url'):
+            return obj.landing_image.url
+        elif obj.product_image and hasattr(obj.product_image, 'url'):
+            return obj.product_image.url
+        return '/media/defaults/default-card.jpg'
+
+    def get_description(self, obj):
+        desc = obj.product_description
+        return desc[:100] + '...' if len(desc) > 100 else desc

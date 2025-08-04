@@ -14,4 +14,5 @@ urlpatterns = [
     path('contact/', ContactMessageAPIView.as_view(), name='contact-message'),
     path('about-company/', AboutCompanyAPIView.as_view(), name='about-company'),
     path('contact-info/', ContactInfoMainPageAPIView.as_view(), name='contact-main'),
+    path('products/categories/<slug:slug>/', CategoryProductsAPIView.as_view(), name='category-products'),
 ]

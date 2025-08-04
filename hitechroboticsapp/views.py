@@ -9,7 +9,7 @@ from django.db.models import Q
 from .models import *
 from .filters import ProductFilter
 from .serializers import (ProductSerializer, OrderSerializer, CategorySerializer, ContactMessageSerializer,
-                          AboutCompanySerializer, ContactInfoSerializer)
+                          AboutCompanySerializer, ContactInfoSerializer, ProductCardSerializer)
 
 
 # Create your views here.
@@ -85,3 +85,26 @@ class ContactInfoMainPageAPIView(RetrieveAPIView):
     def get_object(self):
         # Always return the first instance (single entry for main page)
         return ContactInfo.objects.first()
+
+
+class CategoryProductsAPIView(APIView):
+    def get(self, request, slug):
+        try:
+            category = Category.objects.get(slug=slug)
+        except Category.DoesNotExist:
+            return Response({"error": "Category not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        products = Product.objects.filter(product_category=category)
+        serializer = ProductCardSerializer(products, many=True)
+
+        response_data = {
+            "deviceLandingData": {
+                slug: {
+                    "label": category.name,
+                    "cards": serializer.data
+                }
+            }
+        }
+
+        return Response(response_data, status=status.HTTP_200_OK)
+
