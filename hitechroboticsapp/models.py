@@ -60,8 +60,6 @@ class Product(models.Model):
     battery_capacity = models.CharField(max_length=100, blank=True, null=True)
     battery_protection = models.BooleanField(default=False)
 
-    # Logistics
-    delivery_contents = models.TextField(help_text="Comma-separated list of delivery items")
 
     # Availability
     is_available_for_rent = models.BooleanField(default=True)
