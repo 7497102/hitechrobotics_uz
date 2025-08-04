@@ -12,7 +12,7 @@ urlpatterns = [
     path('categories/', CategoryListAPIView.as_view(), name='category-list'),
     path('products/<slug:slug>/', ProductDetailAPIView.as_view(), name='product-detail'),
     path('contact/', ContactMessageAPIView.as_view(), name='contact-message'),
-    path('about-company/', AboutCompanyAPIView.as_view(), name='about-company'),
+    path('about-us/', AboutCompanyAPIView.as_view(), name='about-us'),
     path('contact-info/', ContactInfoMainPageAPIView.as_view(), name='contact-main'),
     path('products/categories/<slug:slug>/', CategoryProductsAPIView.as_view(), name='category-products'),
 ]

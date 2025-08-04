@@ -66,14 +66,13 @@ class Product(models.Model):
     battery_capacity = models.CharField(max_length=100, blank=True, null=True)
     battery_protection = models.BooleanField(default=False)
 
-
     # Availability
     is_available_for_rent = models.BooleanField(default=True)
     is_available_for_sale = models.BooleanField(default=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
-    #Slug
+    # Slug
     slug = models.SlugField(unique=True, blank=True)
 
     def save(self, *args, **kwargs):
@@ -87,6 +86,12 @@ class Product(models.Model):
     def get_image_url(self):
         if self.product_image and hasattr(self.product_image, 'url'):
             return self.product_image.url
+        else:
+            return '/media/product_images/default.jpg'
+
+    def get_lading_image_url(self):
+        if self.landing_image and hasattr(self.landing_image, 'url'):
+            return self.landing_image.url
         else:
             return '/media/product_images/default.jpg'
 
@@ -168,12 +173,24 @@ class HighlightItem(models.Model):
 
 
 class AboutCompany(models.Model):
-    title = models.CharField(max_length=400)
-    description = models.TextField()
+    title = models.CharField(max_length=255)
+    subtitle = models.TextField()
+    main_paragraph = models.TextField()
     image = models.ImageField(upload_to='aboutcompany/')
+    section_title = models.CharField(max_length=255)
+    section_subtitle = models.TextField()
+    conclusion = models.TextField()
 
     def __str__(self):
         return self.title
+
+
+class AboutFeature(models.Model):
+    about = models.ForeignKey(AboutCompany, related_name='features', on_delete=models.CASCADE)
+    text = models.TextField()
+
+    def __str__(self):
+        return f"Feature for {self.about.title}"
 
 
 class ShowroomLocation(models.Model):
@@ -196,3 +213,17 @@ class ContactInfo(models.Model):
     def __str__(self):
         return self.title
 
+
+class AdditionalDevice(models.Model):
+    product = models.ForeignKey(Product, related_name='additionals', on_delete=models.CASCADE)
+
+    title = models.CharField(max_length=255)
+    description = models.TextField()
+    image = models.ImageField(upload_to='additional_devices/')
+    order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ['order']
+
+    def __str__(self):
+        return f"{self.title} (for {self.product.product_name})"

@@ -89,10 +89,31 @@ class ShowroomLocationAdmin(admin.ModelAdmin):
     list_display = ('city', 'address', 'lat', 'lon')
 
 
+@admin.register(AdditionalDevice)
+class AdditionalDeviceAdmin(admin.ModelAdmin):
+    list_display = ('title', 'product', 'order')
+    list_display_links = ('title',)
+    exclude = ('title', 'description')
+
+
+class AboutFeatureInline(admin.TabularInline):
+    model = AboutFeature
+    extra = 1
+    exclude = ('text',)
+
+
+@admin.register(AboutCompany)
+class AboutCompanyAdmin(admin.ModelAdmin):
+    inlines = [AboutFeatureInline]
+    exclude = ('title', 'subtitle',
+               'main_paragraph', 'section_title',
+               'section_subtitle', 'conclusion')
+
+
 # --- Register Everything ---
 admin.site.register(Product, ProductAdmin)
 admin.site.register(Highlight, HighlightAdmin)
 admin.site.register(Category, CategoryAdmin)
 admin.site.register(Order, OrderAdmin)
 admin.site.register(ContactMessage, ContactMessageAdmin)
-admin.site.register(AboutCompany, AboutCompanyAdmin)
+

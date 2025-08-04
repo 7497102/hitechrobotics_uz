@@ -268,23 +268,34 @@ class ContactMessageSerializer(serializers.ModelSerializer):
         return value
 
 
+class AboutFeatureSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AboutFeature
+        fields = ['text']
+
+
 class AboutCompanySerializer(serializers.ModelSerializer):
-    title_en = serializers.CharField(read_only=True)
-    title_ru = serializers.CharField(read_only=True)
-    title_uz = serializers.CharField(read_only=True)
-    description_en = serializers.CharField(read_only=True)
-    description_ru = serializers.CharField(read_only=True)
-    description_uz = serializers.CharField(read_only=True)
+    imageSrc = serializers.SerializerMethodField()
+    features = AboutFeatureSerializer(many=True)
 
     class Meta:
         model = AboutCompany
-        fields = ['title_en',
-                  'title_ru',
-                  'title_uz',
-                  'description_en',
-                  'description_ru',
-                  'description_uz',
-                  'image']
+        fields = [
+            'title',
+            'subtitle',
+            'main_paragraph',
+            'imageSrc',
+            'section_title',
+            'section_subtitle',
+            'features',
+            'conclusion',
+        ]
+
+    def get_imageSrc(self, obj):
+        request = self.context.get('request')
+        if obj.image and hasattr(obj.image, 'url'):
+            return request.build_absolute_uri(obj.image.url) if request else obj.image.url
+        return '/media/defaults/default-about.jpg'
 
 
 class ShowroomLocationSerializer(serializers.ModelSerializer):
@@ -336,7 +347,7 @@ class ContactInfoSerializer(serializers.ModelSerializer):
 
 class ProductCardSerializer(serializers.ModelSerializer):
     title = serializers.CharField(source='product_name')
-    description = serializers.CharField(source='product_description')
+    description = serializers.SerializerMethodField()
     slug = serializers.SlugField()
     image = serializers.SerializerMethodField()
 
@@ -344,13 +355,152 @@ class ProductCardSerializer(serializers.ModelSerializer):
         model = Product
         fields = ('title', 'slug', 'description', 'image')
 
-    def get_image(self, obj):
-        if obj.landing_image and hasattr(obj.landing_image, 'url'):
-            return obj.landing_image.url
-        elif obj.product_image and hasattr(obj.product_image, 'url'):
-            return obj.product_image.url
-        return '/media/defaults/default-card.jpg'
-
     def get_description(self, obj):
-        desc = obj.product_description
-        return desc[:100] + '...' if len(desc) > 100 else desc
+        desc = obj.product_description or ''
+        return desc[:50] + '...' if len(desc) > 50 else desc
+
+    def get_image(self, obj):
+        request = self.context.get('request')  # 👈 get request context
+
+        image_url = None
+        if obj.landing_image and hasattr(obj.landing_image, 'url'):
+            image_url = obj.landing_image.url
+        elif obj.product_image and hasattr(obj.product_image, 'url'):
+            image_url = obj.product_image.url
+        else:
+            image_url = '/media/defaults/default-card.jpg'
+
+        if request:
+            return request.build_absolute_uri(image_url)  # 👈 full URL
+        return image_url
+
+
+class AdditionalDeviceSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AdditionalDevice
+        fields = ['title', 'description', 'image']
+
+    def get_image(self, obj):
+        request = self.context.get('request')
+        image_url = obj.image.url if obj.image else '/media/defaults/default-additional.jpg'
+        return request.build_absolute_uri(image_url) if request else image_url
+
+
+class IntegrationAccordionSerializer(serializers.Serializer):
+    title = serializers.CharField()
+    items = AdditionalDeviceSerializer(many=True)
+
+
+class ProductDetailSerializer(serializers.ModelSerializer):
+    integrationAccordion = serializers.SerializerMethodField()
+    techSpecs = serializers.SerializerMethodField()
+    features = ProductFeatureSerializer(read_only=True)
+    highlights = HighlightSerializer(source='highlight', read_only=True)
+    product_category_name = serializers.SerializerMethodField()
+
+    def get_product_category_name(self, obj):
+        lang = self.context['request'].META.get('HTTP_ACCEPT_LANGUAGE', 'en')[:2]
+        return getattr(obj.product_category, f'name_{lang}', obj.product_category.name)
+
+    class Meta:
+        model = Product
+        fields = [
+            'product_name',
+            'product_description',
+            'slug',
+            'id',
+            'highlights',
+            'product_name',  # локализуется автоматически через modeltranslation
+            'product_description',  # то же самое
+            'product_image',
+            'product_category_name',  # мультиязычный вывод категории
+            'techSpecs',
+            'product_speed',
+            'product_weight_lifting',
+            'weight_kg',
+            'dimensions_cm',
+            'protection_level',
+            'voice_recognition',
+            'front_light',
+            'carrying_strap',
+            'processor',
+            'cameras_sensors',
+            'camera_specs',
+            'wifi',
+            'bluetooth_version',
+            'battery_life_hours',
+            'battery_model',
+            'battery_capacity',
+            'battery_protection',
+            'created_at',
+            'features',
+            'integrationAccordion'
+        ]
+
+    def get_integrationAccordion(self, obj):
+        items = obj.additionals.all()  # related_name on ForeignKey in AdditionalDevice
+        serializer = AdditionalDeviceSerializer(items, many=True, context=self.context)
+        return {
+            "title": "Purchase additionally:",
+            "items": serializer.data
+        }
+
+    def get_techSpecs(self, obj):
+        lang = self.context['request'].META.get('HTTP_ACCEPT_LANGUAGE', 'en')[:2]
+        lang = lang if lang in ['en', 'ru', 'uz'] else 'en'
+
+        labels = {
+            "en": {
+                "speed": "Maximum speed",
+                "capacity": "Carrying capacity",
+                "wireless": "Wireless module",
+                "autonomy": "Autonomous work"
+            },
+            "ru": {
+                "speed": "Максимальная скорость",
+                "capacity": "Грузоподъёмность",
+                "wireless": "Беспроводной модуль",
+                "autonomy": "Автономная работа"
+            },
+            "uz": {
+                "speed": "Maksimal tezlik",
+                "capacity": "Yuk ko‘tarish qobiliyati",
+                "wireless": "Simsiz aloqa moduli",
+                "autonomy": "Avtonom ish vaqti"
+            }
+        }
+
+        techSpecs = []
+
+        if obj.product_speed:
+            techSpecs.append({
+                "label": labels[lang]["speed"],
+                "value": f"{obj.product_speed} km/h"
+            })
+
+        if obj.product_weight_lifting:
+            techSpecs.append({
+                "label": labels[lang]["capacity"],
+                "value": obj.product_weight_lifting
+            })
+
+        connectivity = []
+        if obj.wifi:
+            connectivity.append("WiFi 6")
+        if obj.bluetooth_version:
+            connectivity.append(f"Bluetooth {obj.bluetooth_version}")
+        if connectivity:
+            techSpecs.append({
+                "label": labels[lang]["wireless"],
+                "value": " and ".join(connectivity)
+            })
+
+        if obj.battery_life_hours:
+            techSpecs.append({
+                "label": labels[lang]["autonomy"],
+                "value": f"{obj.battery_life_hours} hours"
+            })
+
+        return techSpecs

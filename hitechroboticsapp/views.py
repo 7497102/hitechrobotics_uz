@@ -9,7 +9,7 @@ from django.db.models import Q
 from .models import *
 from .filters import ProductFilter
 from .serializers import (ProductSerializer, OrderSerializer, CategorySerializer, ContactMessageSerializer,
-                          AboutCompanySerializer, ContactInfoSerializer, ProductCardSerializer)
+                          AboutCompanySerializer, ContactInfoSerializer, ProductCardSerializer, ProductDetailSerializer)
 
 
 # Create your views here.
@@ -64,7 +64,7 @@ class CategoryListAPIView(ListAPIView):
 
 class ProductDetailAPIView(generics.RetrieveAPIView):
     queryset = Product.objects.all()
-    serializer_class = ProductSerializer
+    serializer_class = ProductDetailSerializer
     lookup_field = 'slug'
 
 
@@ -73,9 +73,17 @@ class ContactMessageAPIView(generics.CreateAPIView):
     serializer_class = ContactMessageSerializer
 
 
-class AboutCompanyAPIView(generics.ListAPIView):
-    queryset = AboutCompany.objects.all()
-    serializer_class = AboutCompanySerializer
+class AboutCompanyAPIView(APIView):
+    def get(self, request):
+        about = AboutCompany.objects.first()
+        if not about:
+            return Response({"error": "No about data found"}, status=404)
+
+        serializer = AboutCompanySerializer(about, context={'request': request})
+        return Response({
+            "aboutUs": serializer.data
+        })
+
 
 
 class ContactInfoMainPageAPIView(RetrieveAPIView):
@@ -88,6 +96,7 @@ class ContactInfoMainPageAPIView(RetrieveAPIView):
 
 
 class CategoryProductsAPIView(APIView):
+
     def get(self, request, slug):
         try:
             category = Category.objects.get(slug=slug)
@@ -95,7 +104,7 @@ class CategoryProductsAPIView(APIView):
             return Response({"error": "Category not found"}, status=status.HTTP_404_NOT_FOUND)
 
         products = Product.objects.filter(product_category=category)
-        serializer = ProductCardSerializer(products, many=True)
+        serializer = ProductCardSerializer(products, many=True, context={'request': request})
 
         response_data = {
             "deviceLandingData": {
@@ -107,4 +116,3 @@ class CategoryProductsAPIView(APIView):
         }
 
         return Response(response_data, status=status.HTTP_200_OK)
-

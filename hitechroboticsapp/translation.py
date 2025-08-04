@@ -19,8 +19,14 @@ class HighlightTranslationOptions(TranslationOptions):
 
 # @register(AboutCompany)
 class AboutCompanyTranslationOptions(TranslationOptions):
-    fields = ('title', 'description',)
+    fields = ('title', 'subtitle',
+              'main_paragraph', 'section_title',
+              'section_subtitle', 'conclusion')
 
+
+@register(AboutFeature)
+class AboutFeatureTranslationOptions(TranslationOptions):
+    fields = ('text',)
 
 @register(ProductFeature)
 class ProductFeatureTranslationOptions(TranslationOptions):
@@ -38,3 +44,8 @@ translator.register(AboutCompany, AboutCompanyTranslationOptions)
 @register(ContactInfo)
 class ContactInfoTranslationOptions(TranslationOptions):
     fields = ('title', 'subtitle',)
+
+
+@register(AdditionalDevice)
+class AdditionalDeviceTranslationOptions(TranslationOptions):
+    fields = ('title', 'description')
