@@ -21,12 +21,33 @@ class HighlightTranslationOptions(TranslationOptions):
 class AboutCompanyTranslationOptions(TranslationOptions):
     fields = ('title', 'subtitle',
               'main_paragraph', 'section_title',
-              'section_subtitle', 'conclusion')
+              'section_subtitle', 'conclusion', 'depth_hero_title')
 
 
 @register(AboutFeature)
 class AboutFeatureTranslationOptions(TranslationOptions):
     fields = ('text',)
+
+
+@register(FeaturedService)
+class FeaturedServiceTranslationOptions(TranslationOptions):
+    fields = ('title', 'desc')
+
+
+@register(CountStat)
+class CountStatTranslationOptions(TranslationOptions):
+    fields = ('title', 'desc')
+
+
+@register(Feature)
+class FeatureTranslationOptions(TranslationOptions):
+    fields = ('title', 'desc')
+
+
+@register(Service)
+class ServiceTranslationOptions(TranslationOptions):
+    fields = ('title', 'desc')
+
 
 @register(ProductFeature)
 class ProductFeatureTranslationOptions(TranslationOptions):
@@ -49,3 +70,13 @@ class ContactInfoTranslationOptions(TranslationOptions):
 @register(AdditionalDevice)
 class AdditionalDeviceTranslationOptions(TranslationOptions):
     fields = ('title', 'description')
+
+
+@register(NavigationShowcase)
+class NavigationShowcaseTranslationOptions(TranslationOptions):
+    fields = ('title', 'description',)
+
+
+@register(ProductFeatureCard)
+class FeatureCardTranslationOptions(TranslationOptions):
+    fields = ('title', 'desc')

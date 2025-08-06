@@ -173,6 +173,8 @@ class HighlightItem(models.Model):
 
 
 class AboutCompany(models.Model):
+    depth_hero_title = models.CharField(max_length=255, default="Kelajak hozir")
+    depth_hero_image = models.ImageField(upload_to='aboutcompany/', null=True, blank=True)
     title = models.CharField(max_length=255)
     subtitle = models.TextField()
     main_paragraph = models.TextField()
@@ -227,3 +229,50 @@ class AdditionalDevice(models.Model):
 
     def __str__(self):
         return f"{self.title} (for {self.product.product_name})"
+
+
+class FeaturedService(models.Model):
+    about = models.ForeignKey('AboutCompany', related_name='featured_services', on_delete=models.CASCADE)
+    title = models.CharField(max_length=255)
+    desc = models.TextField()
+
+
+class CountStat(models.Model):
+    about = models.ForeignKey('AboutCompany', related_name='count_stats', on_delete=models.CASCADE)
+    value = models.CharField(max_length=20)  # e.g., "120+"
+    title = models.CharField(max_length=100)
+    desc = models.TextField()
+
+
+class Feature(models.Model):
+    about = models.ForeignKey('AboutCompany', related_name='features_list', on_delete=models.CASCADE)
+    title = models.CharField(max_length=255)
+    desc = models.TextField()
+
+
+class Service(models.Model):
+    about = models.ForeignKey('AboutCompany', related_name='services_list', on_delete=models.CASCADE)
+    title = models.CharField(max_length=255)
+    desc = models.TextField()
+
+
+# models.py
+class NavigationShowcase(models.Model):
+    product = models.ForeignKey('Product', on_delete=models.CASCADE, related_name='navigation_showcase')
+    title = models.CharField(max_length=255)
+    description = models.TextField()
+    image = models.ImageField(upload_to='navigation_showcase/')
+
+    def __str__(self):
+        return f"{self.title} ({self.product})"
+
+
+class ProductFeatureCard(models.Model):
+    product = models.ForeignKey('Product', related_name='feature_cards',
+                                on_delete=models.CASCADE)
+    title = models.CharField(max_length=300)
+    desc = models.TextField()
+
+    class Meta:
+        verbose_name = "Product Feature Card"
+        verbose_name_plural = "Product Feature Cards"

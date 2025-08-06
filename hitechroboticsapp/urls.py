@@ -15,4 +15,6 @@ urlpatterns = [
     path('about-us/', AboutCompanyAPIView.as_view(), name='about-us'),
     path('contact-info/', ContactInfoMainPageAPIView.as_view(), name='contact-main'),
     path('products/categories/<slug:slug>/', CategoryProductsAPIView.as_view(), name='category-products'),
-]
+    path('models/', RobotGLBModelAPIView.as_view(), name='robot-glb'),
+    ]
+

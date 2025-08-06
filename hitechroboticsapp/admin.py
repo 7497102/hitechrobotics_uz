@@ -1,4 +1,5 @@
 from django.contrib import admin
+from import_export.admin import ImportExportModelAdmin
 from modeltranslation.admin import TranslationAdmin, InlineModelAdmin
 from .models import *
 
@@ -18,6 +19,18 @@ class ProductFeatureAdmin(admin.ModelAdmin):
     exclude = ('title', 'subtitle')
 
 
+class NavigationShowcaseInline(admin.TabularInline):
+    model = NavigationShowcase
+    extra = 1
+    exclude = ('title', 'description')
+
+
+class ProductFeatureCardInline(admin.TabularInline):
+    model = ProductFeatureCard
+    extra = 1  # Number of empty forms shown
+    exclude = ('title', 'desc')
+
+
 # --- Product Admin ---
 class ProductAdmin(TranslationAdmin):
     list_display = (
@@ -34,6 +47,7 @@ class ProductAdmin(TranslationAdmin):
                      'is_available_for_sale')
     list_filter = ('product_category',
                    'created_at')
+    inlines = [NavigationShowcaseInline, ProductFeatureCardInline]
 
 
 # --- Category Admin ---
@@ -102,12 +116,70 @@ class AboutFeatureInline(admin.TabularInline):
     exclude = ('text',)
 
 
+class FeaturedServiceInline(admin.TabularInline):
+    model = FeaturedService
+    extra = 1
+    exclude = ('title',)
+
+
+class CountStatInline(admin.TabularInline):
+    model = CountStat
+    extra = 1
+    exclude = ('title',)
+
+
+class FeatureInline(admin.TabularInline):
+    model = Feature
+    extra = 1
+    exclude = ('title',)
+
+
+class ServiceInline(admin.TabularInline):
+    model = Service
+    extra = 1
+    exclude = ('title',)
+
+
 @admin.register(AboutCompany)
 class AboutCompanyAdmin(admin.ModelAdmin):
-    inlines = [AboutFeatureInline]
-    exclude = ('title', 'subtitle',
-               'main_paragraph', 'section_title',
-               'section_subtitle', 'conclusion')
+    inlines = [
+        AboutFeatureInline,
+        FeaturedServiceInline,
+        CountStatInline,
+        FeatureInline,
+        ServiceInline
+    ]
+    exclude = ('title', 'subtitle', 'main_paragraph', 'section_title', 'section_subtitle',
+               'conclusion', 'depth_hero_title')
+    list_display = ('pk', 'title')
+    # Do NOT exclude translated fields
+    # django-modeltranslation handles title_en, title_ru, etc.
+
+
+# ---------------- ImportExport Support for Bulk Upload ---------------- #
+
+@admin.register(FeaturedService)
+class FeaturedServiceAdmin(ImportExportModelAdmin):
+    list_display = ('title_en', 'desc_en')
+
+
+@admin.register(CountStat)
+class CountStatAdmin(ImportExportModelAdmin):
+    list_display = ('title_en', 'value')
+    exclude = ('title', 'desc')
+
+
+@admin.register(Feature)
+class FeatureAdmin(ImportExportModelAdmin):
+    list_display = ('title_en',)
+
+
+@admin.register(Service)
+class ServiceAdmin(ImportExportModelAdmin):
+    list_display = ('title_en',)
+
+
+# admin.py
 
 
 # --- Register Everything ---
@@ -116,4 +188,3 @@ admin.site.register(Highlight, HighlightAdmin)
 admin.site.register(Category, CategoryAdmin)
 admin.site.register(Order, OrderAdmin)
 admin.site.register(ContactMessage, ContactMessageAdmin)
-

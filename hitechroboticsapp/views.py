@@ -5,6 +5,8 @@ from rest_framework import generics, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.db.models import Q
+from django.conf import settings
+
 
 from .models import *
 from .filters import ProductFilter
@@ -80,9 +82,20 @@ class AboutCompanyAPIView(APIView):
             return Response({"error": "No about data found"}, status=404)
 
         serializer = AboutCompanySerializer(about, context={'request': request})
+
+        depth_hero = {
+            "title": about.depth_hero_title,
+            "backgroundImage": (
+                request.build_absolute_uri(about.depth_hero_image.url)
+                if about.depth_hero_image else None
+            )
+        }
+
         return Response({
-            "aboutUs": serializer.data
+            "depthHero": depth_hero,       # ✅ Appears first
+            "aboutUs": serializer.data     # ✅ Appears second
         })
+
 
 
 
@@ -116,3 +129,12 @@ class CategoryProductsAPIView(APIView):
         }
 
         return Response(response_data, status=status.HTTP_200_OK)
+
+
+class RobotGLBModelAPIView(APIView):
+    def get(self, request):
+        file_path = 'models/robot1.glb'
+        file_url = request.build_absolute_uri(settings.MEDIA_URL + file_path)
+        return Response({
+            "modelUrl": file_url
+        })

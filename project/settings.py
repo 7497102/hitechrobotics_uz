@@ -25,6 +25,7 @@ INSTALLED_APPS = [
     'hitechroboticsapp.apps.HitechroboticsappConfig',
     'rest_framework',
     'django_filters',
+    'import_export',
 ]
 
 

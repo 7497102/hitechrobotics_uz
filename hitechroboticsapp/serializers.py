@@ -274,9 +274,36 @@ class AboutFeatureSerializer(serializers.ModelSerializer):
         fields = ['text']
 
 
+class FeaturedServiceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FeaturedService
+        fields = ['title', 'desc']
+
+
+class CountStatSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CountStat
+        fields = ['value', 'title', 'desc']
+
+
+class FeatureSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Feature
+        fields = ['title', 'desc']
+
+
+class ServiceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Service
+        fields = ['title', 'desc']
+
+
 class AboutCompanySerializer(serializers.ModelSerializer):
     imageSrc = serializers.SerializerMethodField()
-    features = AboutFeatureSerializer(many=True)
+    features = serializers.SerializerMethodField()
+    featuredServices = serializers.SerializerMethodField()
+    counts = serializers.SerializerMethodField()
+    services = serializers.SerializerMethodField()
 
     class Meta:
         model = AboutCompany
@@ -289,13 +316,41 @@ class AboutCompanySerializer(serializers.ModelSerializer):
             'section_subtitle',
             'features',
             'conclusion',
+            'featuredServices',
+            'counts',
+            'services',
         ]
 
     def get_imageSrc(self, obj):
         request = self.context.get('request')
         if obj.image and hasattr(obj.image, 'url'):
-            return request.build_absolute_uri(obj.image.url) if request else obj.image.url
-        return '/media/defaults/default-about.jpg'
+            return request.build_absolute_uri(obj.image.url)
+        return None
+
+    def get_features(self, obj):
+        # Replace this with your real FeatureSerializer
+        features = obj.features_list.all()
+        serializer = FeatureSerializer(features, many=True)
+
+        return {
+            "features": serializer.data,
+        }
+
+    def get_featuredServices(self, obj):
+        services = obj.featured_services.all()
+        return {"services": FeaturedServiceSerializer(services, many=True).data}
+
+    def get_counts(self, obj):
+        stats = obj.count_stats.all()
+        return {"stats": CountStatSerializer(stats, many=True).data}
+
+    def get_services(self, obj):
+        services = obj.services_list.all()
+        return {
+            "title": "Services",
+            "subtitle": "We provide our clients with a full range of services for the implementation, configuration, and effective use of robotics.",
+            "services": ServiceSerializer(services, many=True).data
+        }
 
 
 class ShowroomLocationSerializer(serializers.ModelSerializer):
@@ -393,12 +448,59 @@ class IntegrationAccordionSerializer(serializers.Serializer):
     items = AdditionalDeviceSerializer(many=True)
 
 
+class NavigationShowcaseSerializer(serializers.ModelSerializer):
+    title = serializers.SerializerMethodField()
+    description = serializers.SerializerMethodField()
+    image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = NavigationShowcase
+        fields = ['title', 'description', 'image']
+
+    def get_language(self):
+        request = self.context.get('request')
+        return request.LANGUAGE_CODE if request else 'en'
+
+    def get_title(self, obj):
+        return getattr(obj, f"title_{self.get_language()}", obj.title)
+
+    def get_description(self, obj):
+        return getattr(obj, f"description_{self.get_language()}", obj.description)
+
+    def get_image(self, obj):
+        request = self.context.get('request')  # 👈 get request context
+
+        image_url = None
+        if obj.image and hasattr(obj.image, 'url'):
+            image_url = obj.image.url
+        elif obj.product_image and hasattr(obj.image, 'url'):
+            image_url = obj.image.url
+        else:
+            image_url = '/media/defaults/default-card.jpg'
+
+        if request:
+            return request.build_absolute_uri(image_url)  # 👈 full URL
+        return image_url
+
+
+# serializers.py
+class FeatureCardSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductFeatureCard
+        fields = ('title_en', 'title_ru', 'title_uz', 'desc_en', 'desc_ru', 'desc_uz')
+
+
 class ProductDetailSerializer(serializers.ModelSerializer):
-    integrationAccordion = serializers.SerializerMethodField()
+    featureCards = serializers.SerializerMethodField()
+    navigationShowcase = serializers.SerializerMethodField()
     techSpecs = serializers.SerializerMethodField()
+    integrationAccordion = serializers.SerializerMethodField()
+    specs = serializers.SerializerMethodField()
     features = ProductFeatureSerializer(read_only=True)
     highlights = HighlightSerializer(source='highlight', read_only=True)
     product_category_name = serializers.SerializerMethodField()
+    unitreeHero = serializers.SerializerMethodField()
+    infoModel = serializers.SerializerMethodField()
 
     def get_product_category_name(self, obj):
         lang = self.context['request'].META.get('HTTP_ACCEPT_LANGUAGE', 'en')[:2]
@@ -407,6 +509,10 @@ class ProductDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = [
+            'unitreeHero',
+            'infoModel',
+            'specs',
+            'navigationShowcase',
             'product_name',
             'product_description',
             'slug',
@@ -416,6 +522,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
             'product_description',  # то же самое
             'product_image',
             'product_category_name',  # мультиязычный вывод категории
+
             'techSpecs',
             'product_speed',
             'product_weight_lifting',
@@ -436,6 +543,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
             'battery_protection',
             'created_at',
             'features',
+            'featureCards',
             'integrationAccordion'
         ]
 
@@ -447,7 +555,11 @@ class ProductDetailSerializer(serializers.ModelSerializer):
             "items": serializer.data
         }
 
-    def get_techSpecs(self, obj):
+    def get_navigationShowcase(self, obj):
+        showcases = obj.navigation_showcase.all()
+        return NavigationShowcaseSerializer(showcases, many=True, context=self.context).data
+
+    def get_specs(self, obj):
         lang = self.context['request'].META.get('HTTP_ACCEPT_LANGUAGE', 'en')[:2]
         lang = lang if lang in ['en', 'ru', 'uz'] else 'en'
 
@@ -472,16 +584,16 @@ class ProductDetailSerializer(serializers.ModelSerializer):
             }
         }
 
-        techSpecs = []
+        specs = []
 
         if obj.product_speed:
-            techSpecs.append({
+            specs.append({
                 "label": labels[lang]["speed"],
                 "value": f"{obj.product_speed} km/h"
             })
 
         if obj.product_weight_lifting:
-            techSpecs.append({
+            specs.append({
                 "label": labels[lang]["capacity"],
                 "value": obj.product_weight_lifting
             })
@@ -492,15 +604,155 @@ class ProductDetailSerializer(serializers.ModelSerializer):
         if obj.bluetooth_version:
             connectivity.append(f"Bluetooth {obj.bluetooth_version}")
         if connectivity:
-            techSpecs.append({
+            specs.append({
                 "label": labels[lang]["wireless"],
                 "value": " and ".join(connectivity)
             })
 
         if obj.battery_life_hours:
-            techSpecs.append({
+            specs.append({
                 "label": labels[lang]["autonomy"],
                 "value": f"{obj.battery_life_hours} hours"
             })
 
-        return techSpecs
+        return specs
+
+    def get_techSpecs(self, obj):
+        blocks = []
+
+        # 1. Processor block
+        if obj.processor:
+            blocks.append({
+                "title": "Processors",
+                "tags": [obj.processor]
+            })
+
+        # 2. Cameras & sensors
+        camera_tags = []
+        if obj.cameras_sensors:
+            camera_tags.append(obj.cameras_sensors)
+        if obj.camera_specs:
+            camera_tags.append(obj.camera_specs)
+        if camera_tags:
+            blocks.append({
+                "title": "Cameras and sensors",
+                "tags": camera_tags
+            })
+
+        # 3. Connectivity
+        connectivity = []
+        if obj.wifi:
+            connectivity.append("WiFi 6")
+        if obj.bluetooth_version:
+            connectivity.append(f"Bluetooth {obj.bluetooth_version}")
+        if connectivity:
+            blocks.append({
+                "title": "Additional devices",
+                "tags": connectivity
+            })
+
+        # 4. Battery
+        battery_tags = []
+        if obj.battery_life_hours:
+            battery_tags.append(f"{obj.battery_life_hours} hours")
+        if obj.battery_capacity:
+            battery_tags.append(obj.battery_capacity)
+        if obj.battery_model:
+            battery_tags.append(obj.battery_model)
+        if battery_tags:
+            blocks.append({
+                "title": "Battery",
+                "tags": battery_tags
+            })
+
+        return {"blocks": blocks}
+
+    def get_language(self):
+        request = self.context.get('request')
+        return request.LANGUAGE_CODE if request else 'en'
+
+    def get_image(self, obj):
+        request = self.context.get('request')  # 👈 get request context
+
+        image_url = None
+        if obj.product_image and hasattr(obj.product_image, 'url'):
+            image_url = obj.product_image.url
+        elif obj.product_image and hasattr(obj.product_image, 'url'):
+            image_url = obj.product_image.url
+        else:
+            image_url = '/media/defaults/default-card.jpg'
+
+        if request:
+            return request.build_absolute_uri(image_url)  # 👈 full URL
+        return image_url
+
+    def get_unitreeHero(self, obj):
+        lang = self.get_language()
+
+        texts = {
+            "en": {
+                "subtitle": "Bionic robot in basic configuration",
+                "priceText": "Available for rent",
+                "ctaText": "Make an order",
+            },
+            "ru": {
+                "subtitle": "Бионический робот в базовой комплектации",
+                "priceText": "Доступен для аренды",
+                "ctaText": "Сделать заказ",
+            },
+            "uz": {
+                "subtitle": "Asosiy konfiguratsiyadagi bionik robot",
+                "priceText": "Ijaraga olish mumkin",
+                "ctaText": "Buyurtma berish",
+            }
+        }
+
+        t = texts.get(lang, texts["en"])
+
+        return {
+            "title": getattr(obj, f'product_name_{lang}', ''),
+            "subtitle": t["subtitle"],
+            "priceText": t["priceText"],
+            "ctaText": t["ctaText"],
+            "imageSrc": self.get_image(obj),  # ✅ call with self + obj
+            "imageAlt": getattr(obj, f'product_name_{lang}', ''),
+            "showParticles": True
+        }
+
+        # fallback to English
+
+    def get_infoModel(self, obj):
+        lang = self.get_language()
+
+        static_texts = {
+            "en": {
+                "price": "Available for sale"
+            },
+            "ru": {
+                "price": "Доступен для продажи"
+            },
+            "uz": {
+                "price": "Sotuvga mavjud"
+            }
+        }
+
+        t = static_texts.get(lang, static_texts["en"])
+
+        return {
+            "chip": obj.battery_model,
+            "display": obj.processor,
+            "battery": obj.battery_capacity,
+            "material": obj.bluetooth_version,
+            "price": t["price"],
+        }
+
+    def get_featureCards(self, obj):
+        lang = self.context.get('lang', 'en')
+
+        cards = obj.feature_cards.all()
+        return {
+            "title": f"Advantages of {obj.product_name_en}",
+            "features": FeatureCardSerializer(cards, many=True).data
+        }
+
+
