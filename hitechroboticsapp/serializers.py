@@ -1,8 +1,14 @@
+from __future__ import annotations
+from urllib.parse import urlparse
+from typing import Any, Dict
 from modeltranslation.utils import get_language
 from rest_framework import serializers
 from modeltranslation.utils import get_translation_fields
+from .specs_translations import SPECS_TRANSLATIONS
 from .models import *
 import re
+from functools import cached_property
+
 
 
 class HighlightItemSerializer(serializers.ModelSerializer):
@@ -19,36 +25,15 @@ class HighlightItemSerializer(serializers.ModelSerializer):
 class HighlightSerializer(serializers.ModelSerializer):
     slides = HighlightItemSerializer(many=True, read_only=True)
 
-    title_en = serializers.CharField(read_only=True)
-    title_ru = serializers.CharField(read_only=True)
-    title_uz = serializers.CharField(read_only=True)
-
     class Meta:
         model = Highlight
-        fields = ['title_en',
-                  'title_ru',
-                  'title_uz',
-                  'slides']
+        fields = ['title', 'slides']
 
 
 class FeatureParagraphSerializer(serializers.ModelSerializer):
-    before_en = serializers.CharField(read_only=True)
-    before_ru = serializers.CharField(read_only=True)
-    before_uz = serializers.CharField(read_only=True)
-
-    highlight_en = serializers.CharField(read_only=True)
-    highlight_ru = serializers.CharField(read_only=True)
-    highlight_uz = serializers.CharField(read_only=True)
-
-    after_en = serializers.CharField(read_only=True)
-    after_ru = serializers.CharField(read_only=True)
-    after_uz = serializers.CharField(read_only=True)
-
     class Meta:
         model = FeatureParagraph
-        fields = ['before_en', 'before_ru', 'before_uz',
-                  'highlight_en', 'highlight_ru', 'highlight_uz',
-                  'after_en', 'after_ru', 'after_uz', ]
+        fields = ['before', 'highlight', 'after']
 
 
 class ProductFeatureSerializer(serializers.ModelSerializer):
@@ -59,32 +44,26 @@ class ProductFeatureSerializer(serializers.ModelSerializer):
 
     def get_img1(self, obj):
         request = self.context.get('request')
-        return request.build_absolute_uri(obj.img1.url) if obj.img1 and request else obj.img1.url
+        if obj.img1:
+            return request.build_absolute_uri(obj.img1.url) if request else obj.img1.url
+        return None
 
     def get_img2(self, obj):
         request = self.context.get('request')
-        return request.build_absolute_uri(obj.img2.url) if obj.img2 and request else obj.img2.url
+        if obj.img2:
+            return request.build_absolute_uri(obj.img2.url) if request else obj.img2.url
+        return None
 
     def get_img3(self, obj):
         request = self.context.get('request')
-        return request.build_absolute_uri(obj.img3.url) if obj.img3 and request else obj.img3.url
-
-    title_en = serializers.CharField(read_only=True)
-    title_ru = serializers.CharField(read_only=True)
-    title_uz = serializers.CharField(read_only=True)
-
-    subtitle_en = serializers.CharField(read_only=True)
-    subtitle_ru = serializers.CharField(read_only=True)
-    subtitle_uz = serializers.CharField(read_only=True)
+        if obj.img3:
+            return request.build_absolute_uri(obj.img3.url) if request else obj.img3.url
+        return None
 
     class Meta:
         model = ProductFeature
-        fields = ['title_en',
-                  'title_ru',
-                  'title_uz',
-                  'subtitle_en',
-                  'subtitle_ru',
-                  'subtitle_uz',
+        fields = ['title',
+                  'subtitle',
                   'img1',
                   'img2',
                   'img3',
@@ -98,6 +77,7 @@ class ProductSerializer(serializers.ModelSerializer):
     features = ProductFeatureSerializer(read_only=True)
     highlights = HighlightSerializer(source='highlight', read_only=True)
     product_category_name = serializers.SerializerMethodField()
+    product_category_slug = serializers.SlugField(source='product_category.slug', read_only=True)
 
     def get_product_category_name(self, obj):
         lang = self.context['request'].META.get('HTTP_ACCEPT_LANGUAGE', 'en')[:2]
@@ -112,6 +92,7 @@ class ProductSerializer(serializers.ModelSerializer):
             'product_description',  # то же самое
             'product_image',
             'product_category_name',  # мультиязычный вывод категории
+            'product_category_slug',
             'specs',
             'product_speed',
             'product_weight_lifting',
@@ -194,8 +175,8 @@ class ProductSerializer(serializers.ModelSerializer):
         return specs
 
 
-EMAIL_REGEX = re.compile(r"[^@]+@[^@]+\.[^@]+")
-PHONE_REGEX = re.compile(r'^\+?\d{9,15}$')
+EMAIL_REGEX = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+PHONE_REGEX = re.compile(r"^\+?\d{7,15}$")  # e.g. +998991234567
 
 
 class OrderSerializer(serializers.ModelSerializer):
@@ -229,13 +210,35 @@ class OrderSerializer(serializers.ModelSerializer):
         if value is None:
             raise serializers.ValidationError("Product must be selected.")
 
+        # initial_data is safe here for cross-field validation
         order_type = self.initial_data.get("order_type")
         if order_type == "buy" and not value.is_available_for_sale:
             raise serializers.ValidationError("This product is not available for sale.")
         if order_type == "rent" and not value.is_available_for_rent:
             raise serializers.ValidationError("This product is not available for rent.")
-
         return value
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Optional: shape response for frontend
+        return {
+            "id": instance.id,
+            "status": "ok",
+            "message": "Your request has been received. We’ll contact you soon.",
+            "order": {
+                "fullName": instance.full_name,
+                "email": instance.email,
+                "phone": instance.phone,
+                "orderType": instance.order_type,
+                "product": {
+                    "id": instance.product_id,
+                    "name": instance.product.product_name,
+                    "slug": instance.product.slug,
+                },
+                "message": instance.message,
+                "createdAt": instance.created_at.isoformat(),
+            }
+        }
 
 
 class CategoryProductPreviewSerializer(serializers.ModelSerializer):
@@ -246,26 +249,59 @@ class CategoryProductPreviewSerializer(serializers.ModelSerializer):
 
 class CategorySerializer(serializers.ModelSerializer):
     products = CategoryProductPreviewSerializer(many=True, read_only=True, source='product_set')
+    name_en = serializers.CharField(read_only=True)
+    name_ru = serializers.CharField(read_only=True)
+    name_uz = serializers.CharField(read_only=True)
+    slug = serializers.SlugField(read_only=True)
 
     class Meta:
         model = Category
-        fields = ['id', 'name', 'description', 'products']
+        fields = ['id', 'name', 'description', 'products', 'slug', 'name_en', 'name_ru', 'name_uz']
 
 
 class ContactMessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = ContactMessage
-        fields = '__all__'
+        fields = ("id", "full_name", "email", "phone_number", "message", "created_at")
+        read_only_fields = ("id", "created_at")
 
-    def validate_full_name(self, value):
-        if len(value.strip()) < 3:
-            raise serializers.ValidationError("Name must be at least 3 characters.")
-        return value
+    def validate_full_name(self, value: str) -> str:
+        v = value.strip()
+        if len(v) < 3:
+            raise serializers.ValidationError("Full name must be at least 3 characters long.")
+        if len(v) > 50:
+            raise serializers.ValidationError("Full name cannot exceed 50 characters.")
+        return v
 
-    def validate_message(self, value):
-        if len(value.strip()) < 10:
-            raise serializers.ValidationError("Message must be at least 10 characters.")
-        return value
+    def validate_phone_number(self, value: str) -> str:
+        v = value.strip()
+        if not PHONE_REGEX.match(v):
+            raise serializers.ValidationError("Enter a valid phone number (e.g., +998991234567).")
+        return v
+
+    def validate_message(self, value: str) -> str:
+        v = value.strip()
+        if len(v) < 5:
+            raise serializers.ValidationError("Message must be at least 5 characters long.")
+        if len(v) > 5000:
+            raise serializers.ValidationError("Message must be 5000 characters or fewer.")
+        return v
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Shape response for frontend
+        return {
+            "status": "ok",
+            "message": "Your message has been received. We’ll contact you soon.",
+            "data": {
+                "id": data["id"],
+                "fullName": data["full_name"],
+                "email": data["email"],
+                "phoneNumber": data["phone_number"],
+                "message": data["message"],
+                "createdAt": data["created_at"],
+            }
+        }
 
 
 class AboutFeatureSerializer(serializers.ModelSerializer):
@@ -300,56 +336,113 @@ class ServiceSerializer(serializers.ModelSerializer):
 
 class AboutCompanySerializer(serializers.ModelSerializer):
     imageSrc = serializers.SerializerMethodField()
-    features = serializers.SerializerMethodField()
+    featureList = serializers.SerializerMethodField()
     featuredServices = serializers.SerializerMethodField()
     counts = serializers.SerializerMethodField()
     services = serializers.SerializerMethodField()
+    features = serializers.SerializerMethodField()
+
+    title = serializers.SerializerMethodField()
+    subtitle = serializers.SerializerMethodField()
+    mainParagraph = serializers.SerializerMethodField()
+    sectionTitle = serializers.SerializerMethodField()
+    sectionSubtitle = serializers.SerializerMethodField()
+    conclusion = serializers.SerializerMethodField()
 
     class Meta:
         model = AboutCompany
         fields = [
             'title',
             'subtitle',
-            'main_paragraph',
+            'mainParagraph',
             'imageSrc',
-            'section_title',
-            'section_subtitle',
+            'sectionTitle',
+            'sectionSubtitle',
             'features',
             'conclusion',
+            'featureList',
             'featuredServices',
             'counts',
             'services',
         ]
 
+    def get_language(self):
+        """Get language from request path or header (e.g. /en/, /uz/, /ru/)"""
+        request = self.context.get('request')
+        if request is None:
+            return 'en'
+        path = request.path
+        if path.startswith('/uz/'):
+            return 'uz'
+        elif path.startswith('/ru/'):
+            return 'ru'
+        return 'en'
+
+    def get_translated_field(self, obj, field_base):
+        """Helper to return the translated value based on selected language"""
+        lang = self.get_language()
+        field_name = f"{field_base}_{lang}"
+        return getattr(obj, field_name, '')
+
+    def get_title(self, obj):
+        return self.get_translated_field(obj, "title")
+
+    def get_subtitle(self, obj):
+        return self.get_translated_field(obj, "subtitle")
+
+    def get_features(self, obj):
+        return list(obj.features.values_list('text', flat=True))
+
+    def get_mainParagraph(self, obj):
+        return self.get_translated_field(obj, "main_paragraph")
+
+    def get_sectionTitle(self, obj):
+        return self.get_translated_field(obj, "section_title")
+
+    def get_sectionSubtitle(self, obj):
+        return self.get_translated_field(obj, "section_subtitle")
+
+    def get_conclusion(self, obj):
+        return self.get_translated_field(obj, "conclusion")
+
     def get_imageSrc(self, obj):
         request = self.context.get('request')
-        if obj.image and hasattr(obj.image, 'url'):
+        if obj.image and hasattr(obj.image, 'url') and request:
             return request.build_absolute_uri(obj.image.url)
         return None
 
-    def get_features(self, obj):
-        # Replace this with your real FeatureSerializer
+    def get_featureList(self, obj):
         features = obj.features_list.all()
-        serializer = FeatureSerializer(features, many=True)
-
+        serializer = FeatureSerializer(features, many=True, context=self.context)
         return {
             "features": serializer.data,
         }
 
     def get_featuredServices(self, obj):
         services = obj.featured_services.all()
-        return {"services": FeaturedServiceSerializer(services, many=True).data}
+        return {"services": FeaturedServiceSerializer(services, many=True, context=self.context).data}
 
     def get_counts(self, obj):
         stats = obj.count_stats.all()
-        return {"stats": CountStatSerializer(stats, many=True).data}
+        return {"stats": CountStatSerializer(stats, many=True, context=self.context).data}
 
     def get_services(self, obj):
         services = obj.services_list.all()
+        lang = self.get_language()
+        # Optional: Translate title/subtitle in services block too
+        titles = {
+            'en': ("Services",
+                   "We provide our clients with a full range of services for the implementation, configuration, and effective use of robotics."),
+            'ru': ("Услуги",
+                   "Мы предоставляем полный спектр услуг по внедрению, настройке и эффективному использованию робототехники."),
+            'uz': ("Xizmatlar",
+                   "Biz mijozlarga robototexnikadan samarali foydalanish, sozlash va joriy etish uchun to‘liq xizmatlar ko‘lamini taqdim etamiz.")
+        }
+        title, subtitle = titles.get(lang, titles['en'])
         return {
-            "title": "Services",
-            "subtitle": "We provide our clients with a full range of services for the implementation, configuration, and effective use of robotics.",
-            "services": ServiceSerializer(services, many=True).data
+            "title": title,
+            "subtitle": subtitle,
+            "services": ServiceSerializer(services, many=True, context=self.context).data
         }
 
 
@@ -362,21 +455,13 @@ class ShowroomLocationSerializer(serializers.ModelSerializer):
 class ContactInfoSerializer(serializers.ModelSerializer):
     locations = ShowroomLocationSerializer(many=True, read_only=True)
 
-    title_en = serializers.CharField(read_only=True)
-    title_uz = serializers.CharField(read_only=True)
-    title_ru = serializers.CharField(read_only=True)
-
-    subtitle_en = serializers.CharField(read_only=True)
-    subtitle_uz = serializers.CharField(read_only=True)
-    subtitle_ru = serializers.CharField(read_only=True)
-
     map_src = serializers.URLField(read_only=True)
 
     class Meta:
         model = ContactInfo
         fields = [
-            'title_en', 'title_uz', 'title_ru',
-            'subtitle_en', 'subtitle_uz', 'subtitle_ru',
+            'title',
+            'subtitle',
             'map_src',
             'locations'
         ]
@@ -487,24 +572,22 @@ class NavigationShowcaseSerializer(serializers.ModelSerializer):
 class FeatureCardSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductFeatureCard
-        fields = ('title_en', 'title_ru', 'title_uz', 'desc_en', 'desc_ru', 'desc_uz')
+        fields = ('title', 'desc')
 
 
 class ProductDetailSerializer(serializers.ModelSerializer):
+    features = ProductFeatureSerializer(read_only=True)
+    highlights = HighlightSerializer(source='highlight', read_only=True)
+
+    specifications = serializers.SerializerMethodField()
     featureCards = serializers.SerializerMethodField()
     navigationShowcase = serializers.SerializerMethodField()
     techSpecs = serializers.SerializerMethodField()
     integrationAccordion = serializers.SerializerMethodField()
     specs = serializers.SerializerMethodField()
-    features = ProductFeatureSerializer(read_only=True)
-    highlights = HighlightSerializer(source='highlight', read_only=True)
     product_category_name = serializers.SerializerMethodField()
     unitreeHero = serializers.SerializerMethodField()
     infoModel = serializers.SerializerMethodField()
-
-    def get_product_category_name(self, obj):
-        lang = self.context['request'].META.get('HTTP_ACCEPT_LANGUAGE', 'en')[:2]
-        return getattr(obj.product_category, f'name_{lang}', obj.product_category.name)
 
     class Meta:
         model = Product
@@ -517,12 +600,8 @@ class ProductDetailSerializer(serializers.ModelSerializer):
             'product_description',
             'slug',
             'id',
-            'highlights',
-            'product_name',  # локализуется автоматически через modeltranslation
-            'product_description',  # то же самое
             'product_image',
-            'product_category_name',  # мультиязычный вывод категории
-
+            'product_category_name',
             'techSpecs',
             'product_speed',
             'product_weight_lifting',
@@ -542,217 +621,215 @@ class ProductDetailSerializer(serializers.ModelSerializer):
             'battery_capacity',
             'battery_protection',
             'created_at',
-            'features',
             'featureCards',
-            'integrationAccordion'
+            'integrationAccordion',
+            'features',
+            'highlights',
+            'specifications'
         ]
 
-    def get_integrationAccordion(self, obj):
-        items = obj.additionals.all()  # related_name on ForeignKey in AdditionalDevice
-        serializer = AdditionalDeviceSerializer(items, many=True, context=self.context)
-        return {
-            "title": "Purchase additionally:",
-            "items": serializer.data
-        }
-
-    def get_navigationShowcase(self, obj):
-        showcases = obj.navigation_showcase.all()
-        return NavigationShowcaseSerializer(showcases, many=True, context=self.context).data
-
-    def get_specs(self, obj):
-        lang = self.context['request'].META.get('HTTP_ACCEPT_LANGUAGE', 'en')[:2]
-        lang = lang if lang in ['en', 'ru', 'uz'] else 'en'
-
-        labels = {
-            "en": {
-                "speed": "Maximum speed",
-                "capacity": "Carrying capacity",
-                "wireless": "Wireless module",
-                "autonomy": "Autonomous work"
-            },
-            "ru": {
-                "speed": "Максимальная скорость",
-                "capacity": "Грузоподъёмность",
-                "wireless": "Беспроводной модуль",
-                "autonomy": "Автономная работа"
-            },
-            "uz": {
-                "speed": "Maksimal tezlik",
-                "capacity": "Yuk ko‘tarish qobiliyati",
-                "wireless": "Simsiz aloqa moduli",
-                "autonomy": "Avtonom ish vaqti"
-            }
-        }
-
-        specs = []
-
-        if obj.product_speed:
-            specs.append({
-                "label": labels[lang]["speed"],
-                "value": f"{obj.product_speed} km/h"
-            })
-
-        if obj.product_weight_lifting:
-            specs.append({
-                "label": labels[lang]["capacity"],
-                "value": obj.product_weight_lifting
-            })
-
-        connectivity = []
-        if obj.wifi:
-            connectivity.append("WiFi 6")
-        if obj.bluetooth_version:
-            connectivity.append(f"Bluetooth {obj.bluetooth_version}")
-        if connectivity:
-            specs.append({
-                "label": labels[lang]["wireless"],
-                "value": " and ".join(connectivity)
-            })
-
-        if obj.battery_life_hours:
-            specs.append({
-                "label": labels[lang]["autonomy"],
-                "value": f"{obj.battery_life_hours} hours"
-            })
-
-        return specs
-
-    def get_techSpecs(self, obj):
-        blocks = []
-
-        # 1. Processor block
-        if obj.processor:
-            blocks.append({
-                "title": "Processors",
-                "tags": [obj.processor]
-            })
-
-        # 2. Cameras & sensors
-        camera_tags = []
-        if obj.cameras_sensors:
-            camera_tags.append(obj.cameras_sensors)
-        if obj.camera_specs:
-            camera_tags.append(obj.camera_specs)
-        if camera_tags:
-            blocks.append({
-                "title": "Cameras and sensors",
-                "tags": camera_tags
-            })
-
-        # 3. Connectivity
-        connectivity = []
-        if obj.wifi:
-            connectivity.append("WiFi 6")
-        if obj.bluetooth_version:
-            connectivity.append(f"Bluetooth {obj.bluetooth_version}")
-        if connectivity:
-            blocks.append({
-                "title": "Additional devices",
-                "tags": connectivity
-            })
-
-        # 4. Battery
-        battery_tags = []
-        if obj.battery_life_hours:
-            battery_tags.append(f"{obj.battery_life_hours} hours")
-        if obj.battery_capacity:
-            battery_tags.append(obj.battery_capacity)
-        if obj.battery_model:
-            battery_tags.append(obj.battery_model)
-        if battery_tags:
-            blocks.append({
-                "title": "Battery",
-                "tags": battery_tags
-            })
-
-        return {"blocks": blocks}
-
-    def get_language(self):
+    @cached_property
+    def lang(self):
         request = self.context.get('request')
         return request.LANGUAGE_CODE if request else 'en'
 
-    def get_image(self, obj):
-        request = self.context.get('request')  # 👈 get request context
+    def translate(self, key):
+        return SPECS_TRANSLATIONS.get(key, {}).get(self.lang, key)
 
-        image_url = None
-        if obj.product_image and hasattr(obj.product_image, 'url'):
-            image_url = obj.product_image.url
-        elif obj.product_image and hasattr(obj.product_image, 'url'):
-            image_url = obj.product_image.url
-        else:
-            image_url = '/media/defaults/default-card.jpg'
+    def bool_to_text(self, value):
+        return {
+            'en': 'Yes' if value else 'No',
+            'ru': 'Да' if value else 'Нет',
+            'uz': 'Ha' if value else 'Yo‘q'
+        }.get(self.lang, 'Yes' if value else 'No')
 
-        if request:
-            return request.build_absolute_uri(image_url)  # 👈 full URL
-        return image_url
+    def get_product_category_name(self, obj):
+        return getattr(obj.product_category, f'name_{self.lang}', obj.product_category.name)
 
-    def get_unitreeHero(self, obj):
-        lang = self.get_language()
-
-        texts = {
-            "en": {
-                "subtitle": "Bionic robot in basic configuration",
-                "priceText": "Available for rent",
-                "ctaText": "Make an order",
+    def get_specifications(self, obj):
+        return [
+            {
+                "category": self.translate("physical"),
+                "items": [
+                    {"label": self.translate("dimensions"), "value": obj.dimensions_cm},
+                    {"label": self.translate("protection"), "value": obj.protection_level},
+                    {"label": self.translate("weight"), "value": f"{obj.weight_kg} кг"},
+                ],
             },
-            "ru": {
-                "subtitle": "Бионический робот в базовой комплектации",
-                "priceText": "Доступен для аренды",
-                "ctaText": "Сделать заказ",
+            {
+                "category": self.translate("mobility"),
+                "items": [
+                    {"label": self.translate("speed"), "value": f"{obj.product_speed} км/ч"},
+                    {"label": self.translate("lifting"), "value": obj.product_weight_lifting},
+                ],
             },
-            "uz": {
-                "subtitle": "Asosiy konfiguratsiyadagi bionik robot",
-                "priceText": "Ijaraga olish mumkin",
-                "ctaText": "Buyurtma berish",
-            }
+            {
+                "category": self.translate("electric"),
+                "items": [
+                    {"label": self.translate("battery_capacity"), "value": obj.battery_capacity or "—"},
+                    {"label": self.translate("battery_life"), "value": f"{obj.battery_life_hours} ч"},
+                ],
+            },
+            {
+                "category": self.translate("connectivity"),
+                "items": [
+                    {"label": self.translate("wifi"), "value": self.bool_to_text(obj.wifi)},
+                    {"label": self.translate("bluetooth"), "value": obj.bluetooth_version or "—"},
+                ],
+            },
+            {
+                "category": self.translate("hardware"),
+                "items": [
+                    {"label": self.translate("processor"), "value": obj.processor or "—"},
+                    {"label": self.translate("sensors"), "value": obj.cameras_sensors or "—"},
+                    {"label": self.translate("camera_specs"), "value": obj.camera_specs or "—"},
+                ],
+            },
+            {
+                "category": self.translate("functions"),
+                "items": [
+                    {"label": self.translate("voice"), "value": self.bool_to_text(obj.voice_recognition)},
+                    {"label": self.translate("light"), "value": self.bool_to_text(obj.front_light)},
+                    {"label": self.translate("strap"), "value": self.bool_to_text(obj.carrying_strap)},
+                ],
+            },
+        ]
+
+    def get_featureCards(self, obj):
+        cards = obj.feature_cards.all()
+        return {
+            "title": f"Advantages of {getattr(obj, f'product_name_{self.lang}', obj.product_name)}",
+            "features": FeatureCardSerializer(cards, many=True).data
         }
 
-        t = texts.get(lang, texts["en"])
+    def get_navigationShowcase(self, obj):
+        return NavigationShowcaseSerializer(obj.navigation_showcase.all(), many=True, context=self.context).data
 
+    def get_integrationAccordion(self, obj):
+        items = obj.additionals.all()
         return {
-            "title": getattr(obj, f'product_name_{lang}', ''),
-            "subtitle": t["subtitle"],
-            "priceText": t["priceText"],
-            "ctaText": t["ctaText"],
-            "imageSrc": self.get_image(obj),  # ✅ call with self + obj
-            "imageAlt": getattr(obj, f'product_name_{lang}', ''),
+            "title": {
+                "en": "Purchase additionally:",
+                "ru": "Купить дополнительно:",
+                "uz": "Qo‘shimcha xarid qilish:"
+            }.get(self.lang, "Purchase additionally:"),
+            "items": AdditionalDeviceSerializer(items, many=True, context=self.context).data
+        }
+
+    def get_specs(self, obj):
+        labels = {
+            "speed": {"en": "Maximum speed", "ru": "Максимальная скорость", "uz": "Maksimal tezlik"},
+            "capacity": {"en": "Carrying capacity", "ru": "Грузоподъёмность", "uz": "Yuk ko‘tarish qobiliyati"},
+            "wireless": {"en": "Wireless module", "ru": "Беспроводной модуль", "uz": "Simsiz aloqa moduli"},
+            "autonomy": {"en": "Autonomous work", "ru": "Автономная работа", "uz": "Avtonom ish vaqti"},
+        }
+        result = []
+        if obj.product_speed:
+            result.append({"label": labels["speed"][self.lang], "value": f"{obj.product_speed} km/h"})
+        if obj.product_weight_lifting:
+            result.append({"label": labels["capacity"][self.lang], "value": obj.product_weight_lifting})
+        wireless = []
+        if obj.wifi:
+            wireless.append("WiFi 6")
+        if obj.bluetooth_version:
+            wireless.append(f"Bluetooth {obj.bluetooth_version}")
+        if wireless:
+            result.append({"label": labels["wireless"][self.lang], "value": " and ".join(wireless)})
+        if obj.battery_life_hours:
+            result.append({"label": labels["autonomy"][self.lang], "value": f"{obj.battery_life_hours} hours"})
+        return result
+
+    def get_techSpecs(self, obj):
+        blocks = []
+        if obj.processor:
+            blocks.append({"title": "Processors", "tags": [obj.processor]})
+        camera_tags = list(filter(None, [obj.cameras_sensors, obj.camera_specs]))
+        if camera_tags:
+            blocks.append({"title": "Cameras and sensors", "tags": camera_tags})
+        connectivity = []
+        if obj.wifi:
+            connectivity.append("WiFi 6")
+        if obj.bluetooth_version:
+            connectivity.append(f"Bluetooth {obj.bluetooth_version}")
+        if connectivity:
+            blocks.append({"title": "Additional devices", "tags": connectivity})
+        battery = list(filter(None, [
+            f"{obj.battery_life_hours} hours" if obj.battery_life_hours else None,
+            obj.battery_capacity,
+            obj.battery_model
+        ]))
+        if battery:
+            blocks.append({"title": "Battery", "tags": battery})
+        return {"blocks": blocks}
+
+    def get_image(self, obj):
+        request = self.context.get('request')
+        if obj.product_image and hasattr(obj.product_image, 'url'):
+            url = obj.product_image.url
+        else:
+            url = '/media/defaults/default-card.jpg'
+        return request.build_absolute_uri(url) if request else url
+
+    def get_unitreeHero(self, obj):
+        texts = {
+            "en": {"subtitle": "Bionic robot in basic configuration", "priceText": "Available for rent",
+                   "ctaText": "Make an order"},
+            "ru": {"subtitle": "Бионический робот в базовой комплектации", "priceText": "Доступен для аренды",
+                   "ctaText": "Сделать заказ"},
+            "uz": {"subtitle": "Asosiy konfiguratsiyadagi bionik robot", "priceText": "Ijaraga olish mumkin",
+                   "ctaText": "Buyurtma berish"},
+        }[self.lang]
+        return {
+            "title": getattr(obj, f'product_name_{self.lang}', obj.product_name),
+            "subtitle": texts["subtitle"],
+            "priceText": texts["priceText"],
+            "ctaText": texts["ctaText"],
+            "imageSrc": self.get_image(obj),
+            "imageAlt": getattr(obj, f'product_name_{self.lang}', obj.product_name),
             "showParticles": True
         }
 
-        # fallback to English
-
     def get_infoModel(self, obj):
-        lang = self.get_language()
-
-        static_texts = {
-            "en": {
-                "price": "Available for sale"
-            },
-            "ru": {
-                "price": "Доступен для продажи"
-            },
-            "uz": {
-                "price": "Sotuvga mavjud"
-            }
+        texts = {
+            "en": "Available for sale",
+            "ru": "Доступен для продажи",
+            "uz": "Sotuvga mavjud"
         }
-
-        t = static_texts.get(lang, static_texts["en"])
-
         return {
             "chip": obj.battery_model,
             "display": obj.processor,
             "battery": obj.battery_capacity,
             "material": obj.bluetooth_version,
-            "price": t["price"],
-        }
-
-    def get_featureCards(self, obj):
-        lang = self.context.get('lang', 'en')
-
-        cards = obj.feature_cards.all()
-        return {
-            "title": f"Advantages of {obj.product_name_en}",
-            "features": FeatureCardSerializer(cards, many=True).data
+            "price": texts[self.lang]
         }
 
 
+class RoboticsHeroSerializer(serializers.ModelSerializer):
+    imageSrc = serializers.SerializerMethodField()
+    imageAlt = serializers.CharField(source='image_alt')
+    title = serializers.SerializerMethodField()
+    subtitle = serializers.SerializerMethodField()
+    ctaText = serializers.SerializerMethodField()
+
+    class Meta:
+        model = RoboticsHero
+        fields = ['imageSrc', 'imageAlt', 'title', 'subtitle', 'ctaText']
+
+    def get_imageSrc(self, obj):
+        request = self.context.get('request')
+        return request.build_absolute_uri(obj.image.url) if obj.image else None
+
+    def get_title(self, obj):
+        return getattr(obj, f"title_{get_language()}") or obj.title
+
+    def get_subtitle(self, obj):
+        return getattr(obj, f"subtitle_{get_language()}") or obj.subtitle
+
+    def get_ctaText(self, obj):
+        return getattr(obj, f"cta_text_{get_language()}") or obj.cta_text
+
+
+class SplineModelUrlSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SplineModelUrl
+        fields = ("pk", "spline_url")

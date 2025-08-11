@@ -276,3 +276,23 @@ class ProductFeatureCard(models.Model):
     class Meta:
         verbose_name = "Product Feature Card"
         verbose_name_plural = "Product Feature Cards"
+
+
+class RobotModel3D(models.Model):
+    glb_file = models.FileField(upload_to='models/')
+
+
+class RoboticsHero(models.Model):
+    image = models.ImageField(upload_to='robotImg/')
+    image_alt = models.CharField(max_length=255)
+
+    title = models.CharField(max_length=255)
+    subtitle = models.CharField(max_length=255)
+    cta_text = models.CharField(max_length=255)
+
+    def __str__(self):
+        return self.title
+
+
+class SplineModelUrl(models.Model):
+    spline_url = models.CharField(max_length=500)

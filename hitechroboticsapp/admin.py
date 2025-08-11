@@ -140,6 +140,11 @@ class ServiceInline(admin.TabularInline):
     exclude = ('title',)
 
 
+@admin.register(RobotModel3D)
+class RobotModel3DAdmin(admin.ModelAdmin):
+    list_display = ('glb_file',)
+
+
 @admin.register(AboutCompany)
 class AboutCompanyAdmin(admin.ModelAdmin):
     inlines = [
@@ -179,7 +184,16 @@ class ServiceAdmin(ImportExportModelAdmin):
     list_display = ('title_en',)
 
 
-# admin.py
+@admin.register(RoboticsHero)
+class RoboricsHeroAdmin(admin.ModelAdmin):
+    list_display = ('title_en',)
+    exclude = ('title', 'subtitle', 'cta_text')
+
+
+@admin.register(SplineModelUrl)
+class SplineModelUrlAdmin(admin.ModelAdmin):
+    list_display = ('pk',)
+    list_display_links = ('pk',)
 
 
 # --- Register Everything ---

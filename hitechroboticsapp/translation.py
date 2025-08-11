@@ -80,3 +80,8 @@ class NavigationShowcaseTranslationOptions(TranslationOptions):
 @register(ProductFeatureCard)
 class FeatureCardTranslationOptions(TranslationOptions):
     fields = ('title', 'desc')
+
+
+@register(RoboticsHero)
+class RoboticsHeroTranslationOptions(TranslationOptions):
+    fields = ('title', 'subtitle', 'cta_text')

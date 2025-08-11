@@ -28,7 +28,6 @@ INSTALLED_APPS = [
     'import_export',
 ]
 
-
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
@@ -120,14 +119,17 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-
 REST_FRAMEWORK = {
     'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "20/hour",  # tune as needed
+    },
 }
 
-
 CORS_ALLOW_ALL_ORIGINS = True
-
 
 # CORS_ALLOWED_HOSTS = [
 #     "http://localhost:5173",
@@ -138,7 +140,6 @@ CORS_ALLOW_ALL_ORIGINS = True
 
 CORS_ALLOW_CREDENTIALS = True
 
-
 CORS_ALLOW_METHODS = [
     "DELETE",
     "GET",
@@ -147,7 +148,6 @@ CORS_ALLOW_METHODS = [
     "POST",
     "PUT",
 ]
-
 
 CORS_ALLOW_HEADERS = [
     "accept",

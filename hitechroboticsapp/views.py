@@ -1,17 +1,27 @@
+from __future__ import annotations
+from typing import Any
+
+from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
+from django.utils.timezone import now
+from rest_framework import mixins, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.generics import ListAPIView, RetrieveAPIView
 from rest_framework.pagination import PageNumberPagination
-from rest_framework import generics, status
+from rest_framework import generics, status, permissions, viewsets
+from rest_framework.permissions import AllowAny, IsAdminUser
+from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
+from rest_framework.request import Request
 from rest_framework.response import Response
 from django.db.models import Q
+from rest_framework.throttling import AnonRateThrottle
 from django.conf import settings
-
 
 from .models import *
 from .filters import ProductFilter
-from .serializers import (ProductSerializer, OrderSerializer, CategorySerializer, ContactMessageSerializer,
-                          AboutCompanySerializer, ContactInfoSerializer, ProductCardSerializer, ProductDetailSerializer)
+from .serializers import *
 
 
 # Create your views here.
@@ -29,9 +39,17 @@ class ProductListAPIView(ListAPIView):
     filterset_class = ProductFilter
 
 
-class SubmitOrderAPIView(generics.CreateAPIView):
-    queryset = Order.objects.all()
+class OrderCreateAPIView(generics.CreateAPIView):
     serializer_class = OrderSerializer
+    permission_classes = [AllowAny]
+    throttle_classes = [AnonRateThrottle]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
 
 class ProductSearchAPIView(ListAPIView):
@@ -70,9 +88,17 @@ class ProductDetailAPIView(generics.RetrieveAPIView):
     lookup_field = 'slug'
 
 
-class ContactMessageAPIView(generics.CreateAPIView):
-    queryset = ContactMessage.objects.all()
+class ContactMessageCreateAPIView(generics.CreateAPIView):
     serializer_class = ContactMessageSerializer
+    permission_classes = [AllowAny]
+    throttle_classes = [AnonRateThrottle]  # Optional: configure rate in settings
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
 
 class AboutCompanyAPIView(APIView):
@@ -92,11 +118,9 @@ class AboutCompanyAPIView(APIView):
         }
 
         return Response({
-            "depthHero": depth_hero,       # ✅ Appears first
-            "aboutUs": serializer.data     # ✅ Appears second
+            "depthHero": depth_hero,  # ✅ Appears first
+            "aboutUs": serializer.data  # ✅ Appears second
         })
-
-
 
 
 class ContactInfoMainPageAPIView(RetrieveAPIView):
@@ -132,9 +156,34 @@ class CategoryProductsAPIView(APIView):
 
 
 class RobotGLBModelAPIView(APIView):
+    permission_classes = [permissions.AllowAny]
+
     def get(self, request):
-        file_path = 'models/robot1.glb'
-        file_url = request.build_absolute_uri(settings.MEDIA_URL + file_path)
-        return Response({
-            "modelUrl": file_url
-        })
+        model_instance = RobotModel3D.objects.last()
+        if model_instance and model_instance.glb_file:
+            model_url = request.build_absolute_uri(model_instance.glb_file.url)
+            return Response({"modelUrl": model_url}, status=status.HTTP_200_OK)
+        return Response({"detail": "No model uploaded."}, status=status.HTTP_404_NOT_FOUND)
+
+
+class RoboticsHeroView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        hero = RoboticsHero.objects.first()
+        if hero:
+            serializer = RoboticsHeroSerializer(hero, context={'request': request})
+            return Response(serializer.data)
+        return Response({"detail": "Not found"}, status=404)
+
+
+class SplineModelUrlView(APIView):
+    """
+    Returns all spline model URLs.
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request, *args, **kwargs):
+        queryset = SplineModelUrl.objects.all()
+        serializer = SplineModelUrlSerializer(queryset, many=True)
+        return Response(serializer.data)
