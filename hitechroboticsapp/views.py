@@ -1,8 +1,11 @@
 from __future__ import annotations
 from typing import Any
-
+import requests
 from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
+from django.http import HttpResponse, StreamingHttpResponse
 from django.utils.timezone import now
+from django.views.decorators.http import require_GET
+from django.views.decorators.clickjacking import xframe_options_exempt
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
@@ -179,7 +182,8 @@ class RoboticsHeroView(APIView):
 
 class SplineModelUrlView(APIView):
     """
-    Returns all spline model URLs.
+    Returns all spline model URLs from the database as JSON.
+    (No pk; always a list.)
     """
     permission_classes = [AllowAny]
 
@@ -187,3 +191,59 @@ class SplineModelUrlView(APIView):
         queryset = SplineModelUrl.objects.all()
         serializer = SplineModelUrlSerializer(queryset, many=True)
         return Response(serializer.data)
+
+
+@xframe_options_exempt
+@require_GET
+def spline_proxy(request):
+    """
+    Proxies the Spline URL so you can hide the direct Spline link
+    and avoid exposing it on the frontend.
+
+    Logic:
+      - If there is at least one SplineModelUrl in DB -> use the first().spline_url
+      - Otherwise fall back to your hardcoded default URL.
+    """
+    DEFAULT_SPLINE_URL = "https://my.spline.design/nexbotrobotcharacterconcept-U710QbcCaueudeie1QgVOCuU/"
+
+    # Prefer DB value if present
+    obj = SplineModelUrl.objects.first()
+    spline_url = obj.spline_url if obj and obj.spline_url else DEFAULT_SPLINE_URL
+
+    try:
+        # Pass along a minimal set of headers; stream to reduce memory usage
+        upstream = requests.get(
+            spline_url,
+            timeout=15,
+            stream=True,
+            headers={
+                "User-Agent": request.META.get("HTTP_USER_AGENT", "Mozilla/5.0"),
+                "Accept": request.META.get("HTTP_ACCEPT", "*/*"),
+            },
+        )
+    except requests.RequestException as e:
+        return HttpResponse(
+            f"Upstream request failed: {e}",
+            status=502,
+            content_type="text/plain; charset=utf-8",
+        )
+
+    # If upstream error, return its payload/status to the client
+    content_type = upstream.headers.get("Content-Type", "text/html; charset=utf-8")
+
+    if upstream.status_code != 200:
+        content = upstream.content if not upstream.raw.closed else b""
+        return HttpResponse(content, status=upstream.status_code, content_type=content_type)
+
+    # Stream success responses
+    def stream_generator():
+        for chunk in upstream.iter_content(chunk_size=64 * 1024):
+            if chunk:
+                yield chunk
+
+    resp = StreamingHttpResponse(stream_generator(), content_type=content_type)
+    # Forward a few useful headers if present
+    for hdr in ("Cache-Control", "ETag", "Last-Modified"):
+        if hdr in upstream.headers:
+            resp[hdr] = upstream.headers[hdr]
+    return resp

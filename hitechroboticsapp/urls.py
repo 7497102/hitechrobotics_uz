@@ -4,7 +4,8 @@ from .views import *
 
 urlpatterns = [
     path('mobile-hero/', RoboticsHeroView.as_view(), name='mobile-hero'),
-    path('spline-url/', SplineModelUrlView.as_view(), name='spline-url'),
+    path("spline-models/", SplineModelUrlView.as_view(), name="spline-model-list"),
+    path("spline-proxy/", spline_proxy, name="spline-proxy"),
     path('models/', RobotGLBModelAPIView.as_view(), name='robot_file'),
     path('products/', ProductListAPIView.as_view(), name='product-list'),
     path('order-page/', OrderCreateAPIView.as_view(), name='order-page'),

@@ -1,13 +1,23 @@
+import os
 from pathlib import Path
-from decouple import config, Csv
+from dotenv import load_dotenv
+
+load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = config('SECRET_KEY')
+SECRET_KEY = os.getenv('SECRET_KEY')
 
-DEBUG = True
+DEBUG = os.getenv('DEBUG')
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ['hitechrobotics.uz', 'www.hitechrobotics.uz', 'localhost', '127.0.0.1']
+
+# -----------------------
+# ✅ SECURITY SETTINGS
+# -----------------------
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = True
+SECURE_SSL_REDIRECT = True
 
 # -----------------------
 # ✅ INSTALLED_APPS ORDER
@@ -65,23 +75,24 @@ WSGI_APPLICATION = 'project.wsgi.application'
 # --------------------
 # ✅ DATABASE CONFIG
 # --------------------
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#     }
+# }
+
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': os.getenv('DB_ENGINE'),
+        'NAME': os.getenv('DB_NAME'),
+        'USER': os.getenv('DB_USER'),
+        'PASSWORD': os.getenv('DB_PASSWORD'),
+        'HOST': os.getenv('DB_HOST'),
+        'PORT': os.getenv('DB_PORT'),
     }
 }
 
-# DATABASES = {
-#     'default': {
-#         'ENGINE': config('DB_ENGINE'),
-#         'NAME': config('DB_NAME'),
-#         'USER': config('DB_USER'),
-#         'PASSWORD': config('DB_PASSWORD'),
-#         'HOST': config('DB_HOST'),
-#         'PORT': config('DB_PORT'),
-#     }
-# }
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
@@ -113,6 +124,7 @@ USE_TZ = True
 # ✅ STATIC & MEDIA
 # --------------------
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'static'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
@@ -124,18 +136,15 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.AnonRateThrottle",
     ],
-    "DEFAULT_THROTTLE_RATES": {
-        "anon": "20/hour",  # tune as needed
-    },
 }
 
-CORS_ALLOW_ALL_ORIGINS = True
+# CORS_ALLOW_ALL_ORIGINS = True
 
-# CORS_ALLOWED_HOSTS = [
-#     "http://localhost:5173",
-#     "http://10.20.1.16:3000",
-#     "https://hitechrobotics.uz",
-# ]
+CORS_ALLOWED_HOSTS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:8000/",
+    "https://hitechrobotics.uz",
+]
 
 
 CORS_ALLOW_CREDENTIALS = True
