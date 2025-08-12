@@ -296,3 +296,7 @@ class RoboticsHero(models.Model):
 
 class SplineModelUrl(models.Model):
     spline_url = models.CharField(max_length=500)
+
+
+class PhoneNumber(models.Model):
+    phone_number = models.CharField(max_length=300)

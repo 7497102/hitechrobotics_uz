@@ -2,16 +2,15 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
-
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / '.env')
 
 SECRET_KEY = os.getenv('SECRET_KEY')
 
 DEBUG = os.getenv('DEBUG')
 
-ALLOWED_HOSTS = ['hitechrobotics.uz', 'www.hitechrobotics.uz', 'localhost', '127.0.0.1']
-
+ALLOWED_HOSTS = ['hitechrobotics.uz', 'www.hitechrobotics.uz', 'localhost', '127.0.0.1', '103.246.147.241']
+# ALLOWED_HOSTS = ['*']
 # -----------------------
 # ✅ SECURITY SETTINGS
 # -----------------------
@@ -138,16 +137,15 @@ REST_FRAMEWORK = {
     ],
 }
 
-# CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = True
 
 CORS_ALLOWED_HOSTS = [
-    "http://localhost:5173",
+    "http://172.20.10.3:5173/",
     "http://127.0.0.1:8000/",
     "https://hitechrobotics.uz",
 ]
 
-
-CORS_ALLOW_CREDENTIALS = True
+# CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOW_METHODS = [
     "DELETE",
@@ -165,4 +163,5 @@ CORS_ALLOW_HEADERS = [
     "origin",
     "x-csrftoken",
     "x-requested-with",
+    'ngrok-skip-browser-warning',
 ]

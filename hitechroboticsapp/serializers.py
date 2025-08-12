@@ -833,3 +833,9 @@ class SplineModelUrlSerializer(serializers.ModelSerializer):
     class Meta:
         model = SplineModelUrl
         fields = ("pk", "spline_url")
+
+
+class PhoneNumberSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PhoneNumber
+        fields = ('phone_number',)

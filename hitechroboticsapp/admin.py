@@ -174,6 +174,11 @@ class CountStatAdmin(ImportExportModelAdmin):
     exclude = ('title', 'desc')
 
 
+@admin.register(PhoneNumber)
+class PhoneNumberAdmin(admin.ModelAdmin):
+    list_display = ('pk', 'phone_number')
+
+
 @admin.register(Feature)
 class FeatureAdmin(ImportExportModelAdmin):
     list_display = ('title_en',)

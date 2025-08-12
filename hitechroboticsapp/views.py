@@ -6,9 +6,6 @@ from django.http import HttpResponse, StreamingHttpResponse
 from django.utils.timezone import now
 from django.views.decorators.http import require_GET
 from django.views.decorators.clickjacking import xframe_options_exempt
-from rest_framework import mixins, status, viewsets
-from rest_framework.decorators import action
-from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.generics import ListAPIView, RetrieveAPIView
 from rest_framework.pagination import PageNumberPagination
@@ -178,6 +175,15 @@ class RoboticsHeroView(APIView):
             serializer = RoboticsHeroSerializer(hero, context={'request': request})
             return Response(serializer.data)
         return Response({"detail": "Not found"}, status=404)
+
+
+class PhoneNumberView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, reqeust):
+        queryset = PhoneNumber.objects.all()
+        serializer = PhoneNumberSerializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 class SplineModelUrlView(APIView):
