@@ -16,7 +16,10 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG')
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ["hitechrobotics.uz", "www.hitechrobotics.uz", "127.0.0.1"]
+
+CSRF_TRUSTED_ORIGINS = ["https://hitechrobotics.uz","https://www.hitechrobotics.uz"]
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 # -----------------------
 
 
@@ -25,7 +28,6 @@ ALLOWED_HOSTS = ['*']
 # -----------------------
 INSTALLED_APPS = [
     'modeltranslation',
-    'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
